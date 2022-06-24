@@ -8,9 +8,9 @@ import (
 type MFloat [][]float64
 
 func NewFloatMatrix(x, y int) MFloat {
-	mfloat64 := make([][]float64, x)
-	for i := 0; i < x; i++ {
-		mfloat64[i] = make([]float64, y)
+	mfloat64 := make([][]float64, y)
+	for i := 0; i < y; i++ {
+		mfloat64[i] = make([]float64, x)
 	}
 	return (MFloat)(mfloat64)
 }
@@ -45,9 +45,9 @@ func MFloatScalarMul(m MFloat, n float64) MFloat {
 
 func MFloatTranspose(m MFloat) MFloat {
 	var x, y int
-	x = len(m)
-	if x > 0 {
-		y = len(m[0])
+	y = len(m)
+	if y > 0 {
+		x = len(m[0])
 	}
 	nm := NewFloatMatrix(y, x)
 	var wg sync.WaitGroup
@@ -56,7 +56,7 @@ func MFloatTranspose(m MFloat) MFloat {
 			wg.Add(1)
 			go func(i, j int) {
 				defer wg.Done()
-				nm[j][i] = m[i][j]
+				nm[i][j] = m[j][i]
 			}(i, j)
 		}
 	}
@@ -76,34 +76,30 @@ func MFloatMainDiag(m MFloat) ([]float64, error) {
 	nm := make([]float64, x)
 	var wg sync.WaitGroup
 	for i := 0; i < x; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			nm[i] = m[i][i]
-		}(i)
+		nm[i] = m[i][i]
 	}
 	wg.Wait()
 	return nm, nil
 }
 
 func MFloatSum(a MFloat, b MFloat) (MFloat, error) {
-	var xa, ya int
-	xa = len(a)
-	if xa > 0 {
-		ya = len(a[0])
+	var ya, xa int
+	ya = len(a)
+	if ya > 0 {
+		xa = len(a[0])
 	}
-	var xb, yb int
-	xb = len(b)
-	if xb > 0 {
-		yb = len(b[0])
+	var yb, xb int
+	yb = len(b)
+	if yb > 0 {
+		xb = len(b[0])
 	}
-	if xa != xb || ya != yb {
+	if ya != yb || xa != xb {
 		return nil, errors.New("not balance")
 	}
 	nm := NewFloatMatrix(xa, ya)
 	var wg sync.WaitGroup
-	for i := 0; i < xa; i++ {
-		for j := 0; j < ya; j++ {
+	for i := 0; i < ya; i++ {
+		for j := 0; j < xa; j++ {
 			wg.Add(1)
 			go func(i, j int) {
 				defer wg.Done()
@@ -113,4 +109,67 @@ func MFloatSum(a MFloat, b MFloat) (MFloat, error) {
 	}
 	wg.Wait()
 	return nm, nil
+}
+
+func MFloatProduct(a MFloat, b MFloat) (MFloat, error) {
+	var ya, xa int
+	ya = len(a)
+	if ya > 0 {
+		xa = len(a[0])
+	}
+	var yb, xb int
+	yb = len(b)
+	if yb > 0 {
+		xb = len(b[0])
+	}
+	if ya != xb {
+		return nil, errors.New("incompatible")
+	}
+	nm := NewFloatMatrix(ya, xb)
+	n := xa
+	var wg sync.WaitGroup
+	for i := 0; i < xb; i++ {
+		for j := 0; j < ya; j++ {
+			wg.Add(1)
+			go func(i, j int) {
+				defer wg.Done()
+				sum := 0.0
+				for k := 0; k < n; k++ {
+					sum += a[j][k] * b[k][i]
+				}
+				nm[j][i] = sum
+			}(i, j)
+		}
+	}
+	wg.Wait()
+	return nm, nil
+}
+
+func MFloatSubmatrix(a MFloat, x, y int) (MFloat, error) {
+	var xa, ya int
+	xa = len(a)
+	if xa > 0 {
+		ya = len(a[0])
+	}
+	if xa <= 0 || ya <= 0 || x < 0 || y < 0 || x >= xa || y >= ya {
+		return nil, errors.New("invalid")
+	}
+
+	n := NewFloatMatrix(xa-1, ya-1)
+	for i := 0; i < xa; i++ {
+		for j := 0; j < ya; j++ {
+			xn, yn := i, j
+			if xn == x || yn == y {
+				continue
+			}
+			if xn > x {
+				xn = i - 1
+			}
+			if yn > y {
+				yn = j - 1
+			}
+			n[xn][yn] = a[i][j]
+		}
+	}
+	return n, nil
 }

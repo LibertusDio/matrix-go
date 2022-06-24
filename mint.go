@@ -8,9 +8,9 @@ import (
 type MInt [][]int
 
 func NewIntMatrix(x, y int) MInt {
-	mint := make([][]int, x)
-	for i := 0; i < x; i++ {
-		mint[i] = make([]int, y)
+	mint := make([][]int, y)
+	for i := 0; i < y; i++ {
+		mint[i] = make([]int, x)
 	}
 	return (MInt)(mint)
 }
@@ -45,9 +45,9 @@ func MIntScalarMul(m MInt, n int) MInt {
 
 func MIntTranspose(m MInt) MInt {
 	var x, y int
-	x = len(m)
-	if x > 0 {
-		y = len(m[0])
+	y = len(m)
+	if y > 0 {
+		x = len(m[0])
 	}
 	nm := NewIntMatrix(y, x)
 	var wg sync.WaitGroup
@@ -56,7 +56,7 @@ func MIntTranspose(m MInt) MInt {
 			wg.Add(1)
 			go func(i, j int) {
 				defer wg.Done()
-				nm[j][i] = m[i][j]
+				nm[i][j] = m[j][i]
 			}(i, j)
 		}
 	}
@@ -87,23 +87,23 @@ func MIntMainDiag(m MInt) ([]int, error) {
 }
 
 func MIntSum(a MInt, b MInt) (MInt, error) {
-	var xa, ya int
-	xa = len(a)
-	if xa > 0 {
-		ya = len(a[0])
+	var ya, xa int
+	ya = len(a)
+	if ya > 0 {
+		xa = len(a[0])
 	}
-	var xb, yb int
-	xb = len(b)
-	if xb > 0 {
-		yb = len(b[0])
+	var yb, xb int
+	yb = len(b)
+	if yb > 0 {
+		xb = len(b[0])
 	}
-	if xa != xb || ya != yb {
+	if ya != yb || xa != xb {
 		return nil, errors.New("not balance")
 	}
 	nm := NewIntMatrix(xa, ya)
 	var wg sync.WaitGroup
-	for i := 0; i < xa; i++ {
-		for j := 0; j < ya; j++ {
+	for i := 0; i < ya; i++ {
+		for j := 0; j < xa; j++ {
 			wg.Add(1)
 			go func(i, j int) {
 				defer wg.Done()
@@ -113,4 +113,67 @@ func MIntSum(a MInt, b MInt) (MInt, error) {
 	}
 	wg.Wait()
 	return nm, nil
+}
+
+func MIntProduct(a MInt, b MInt) (MInt, error) {
+	var ya, xa int
+	ya = len(a)
+	if ya > 0 {
+		xa = len(a[0])
+	}
+	var yb, xb int
+	yb = len(b)
+	if yb > 0 {
+		xb = len(b[0])
+	}
+	if ya != xb {
+		return nil, errors.New("incompatible")
+	}
+	nm := NewIntMatrix(ya, xb)
+	n := xa
+	var wg sync.WaitGroup
+	for i := 0; i < xb; i++ {
+		for j := 0; j < ya; j++ {
+			wg.Add(1)
+			go func(i, j int) {
+				defer wg.Done()
+				sum := 0
+				for k := 0; k < n; k++ {
+					sum += a[j][k] * b[k][i]
+				}
+				nm[j][i] = sum
+			}(i, j)
+		}
+	}
+	wg.Wait()
+	return nm, nil
+}
+
+func MIntSubmatrix(a MInt, x, y int) (MInt, error) {
+	var xa, ya int
+	xa = len(a)
+	if xa > 0 {
+		ya = len(a[0])
+	}
+	if xa <= 0 || ya <= 0 || x < 0 || y < 0 || x >= xa || y >= ya {
+		return nil, errors.New("invalid")
+	}
+
+	n := NewIntMatrix(xa-1, ya-1)
+	for i := 0; i < xa; i++ {
+		for j := 0; j < ya; j++ {
+			xn, yn := i, j
+			if xn == x || yn == y {
+				continue
+			}
+			if xn > x {
+				xn = i - 1
+			}
+			if yn > y {
+				yn = j - 1
+			}
+			n[xn][yn] = a[i][j]
+		}
+	}
+	return n, nil
 }
